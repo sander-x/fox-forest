@@ -1,0 +1,5 @@
+/.mypy_cache
+/.pytest_cache
+/.vscode
+/foxforest/__pycache__
+/tests/__pycache__
