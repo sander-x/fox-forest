@@ -116,7 +116,7 @@ class TestGame:
 
         test_game.player_turn = test_game.player2
 
-        test_game.played_cards.append(first_card)
+        test_game.current_trick_cards.append(first_card)
         test_game.player2.hand = hand
 
         test_play = Play(test_game.player2, second_card, use_ability=False)
@@ -139,7 +139,7 @@ class TestGame:
 
         test_game.player_turn = test_game.player2
 
-        test_game.played_cards.append(first_card)
+        test_game.current_trick_cards.append(first_card)
         test_game.player2.hand = hand
 
         test_play = Play(test_game.player2, second_card, use_ability=False)
@@ -166,7 +166,7 @@ class TestGame:
         test_game.decree_card = Card(1, "K", None)
 
         # trump suit beats higher value
-        test_game.played_cards = [
+        test_game.current_trick_cards = [
             Card(5, "K", test_game.player1),
             Card(10, "B", test_game.player2),
         ]
@@ -177,7 +177,7 @@ class TestGame:
         # higher value wins for non-trump suit
         test_game.decree_card = Card(1, "K", None)
 
-        test_game.played_cards = [
+        test_game.current_trick_cards = [
             Card(5, "B", test_game.player1),
             Card(10, "B", test_game.player2),
         ]
@@ -188,21 +188,21 @@ class TestGame:
         # if one 9 is played counts as trump
         test_game.decree_card = Card(1, "K", None)
 
-        test_game.played_cards = [
+        test_game.current_trick_cards = [
             Card(9, "M", test_game.player1),
             Card(10, "B", test_game.player2),
         ]
 
         assert test_game.determine_trick_winner() == test_game.player1
 
-        test_game.played_cards = [
+        test_game.current_trick_cards = [
             Card(9, "M", test_game.player1),
             Card(8, "K", test_game.player2),
         ]
 
         assert test_game.determine_trick_winner() == test_game.player1
 
-        test_game.played_cards = [
+        test_game.current_trick_cards = [
             Card(9, "M", test_game.player1),
             Card(9, "K", test_game.player2),
         ]

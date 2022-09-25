@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import foxforest.game as game
 
-
+from typing import Optional
 from typing import List
 import numpy as np
 import numpy.typing as npt
@@ -154,3 +154,22 @@ class HumanPlayer(Player):
         chosen_move = int(chosen_move_nr) - 1
 
         return self.hand[int(chosen_move)]
+    
+class StreamlitPlayer(Player):
+    
+    def __init__(self, name: str):
+        Player.__init__(self, name)
+        self.picked_card: Optional[game.Card] = None
+    
+    def request_play(self, game_being_played: "game.Game") -> "game.Play":
+
+        chosen_play = game.Play(self, self.picked_card)
+
+        return chosen_play
+
+    def request_discard(self, game_being_played: "game.Game") -> "game.Card":
+
+        chosen_play = game.Play(self, self.picked_card)
+
+        return chosen_play
+    
