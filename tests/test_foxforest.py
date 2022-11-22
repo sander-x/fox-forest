@@ -250,15 +250,14 @@ class TestGame:
             test_game.player1, Player
         )
 
-        test_play = Play(
-            test_game.player1,
-            hand[0],
-            use_ability=True,
-            ability_card=hand[1],
-        )
+        test_play = Play(test_game.player1, hand[0])
 
         test_game.execute_play(test_play)
 
-        assert test_game.deck.cards[-1] == Card(8, "B")
+        card_to_discard = test_game.player1.request_discard(self)
+        discard_play = Play(test_game.player1, card_to_discard)
 
+        test_game.execute_discard(discard_play)
+
+        assert test_game.deck.cards[-1] == Card(8, "B")
         assert test_game.player1.hand == [Card(9, "M")]

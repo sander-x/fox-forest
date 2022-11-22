@@ -154,22 +154,25 @@ class HumanPlayer(Player):
         chosen_move = int(chosen_move_nr) - 1
 
         return self.hand[int(chosen_move)]
-    
+
+
 class StreamlitPlayer(Player):
-    
     def __init__(self, name: str):
         Player.__init__(self, name)
         self.picked_card: Optional[game.Card] = None
-    
+
     def request_play(self, game_being_played: "game.Game") -> "game.Play":
 
+        assert type(self.picked_card) == game.Card
         chosen_play = game.Play(self, self.picked_card)
 
         return chosen_play
 
     def request_discard(self, game_being_played: "game.Game") -> "game.Card":
 
-        chosen_play = game.Play(self, self.picked_card)
+        assert type(self.picked_card) == game.Card
+        to_discard = self.picked_card
 
-        return chosen_play
-    
+        self.picked_card = None
+
+        return to_discard
