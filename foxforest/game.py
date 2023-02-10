@@ -85,7 +85,10 @@ class Game:
         self.player_turn: Player = player1
 
         self.decree_card: Card
-        self.played_cards: List[Card] = []
+        self.current_trick_cards: List[Card] = []
+        self.round_done: bool = True
+
+        self.played_tricks: List[List[Card]] = []
 
     def setup_game(self):
 
@@ -93,9 +96,13 @@ class Game:
         self.deck.create_deck()
         self.deck.shuffle_deck()
 
-        self.played_cards = []
+        self.current_trick_cards = []
 
         # define players and deal cards
+        self.player1.hand = []
+        self.player2.hand = []
+        self.player1.tricks_won = []
+        self.player2.tricks_won = []
         self.player1.add_to_hand(self.deck.draw_top_n_cards(13))
         self.player2.add_to_hand(self.deck.draw_top_n_cards(13))
 
@@ -107,6 +114,24 @@ class Game:
 
         # set whose turn it is
         self.player_turn = self.player1
+        self.turns = 0
+
+        # used in step() to signify card to discard must be provided
+        self.wait_for_discard = False
+
+        # initiate round
+        self.round_done = False
+
+    def change_turn(self) -> Player:
+
+        if self.player_turn == self.player1:
+
+            self.player_turn = self.player2
+            return self.player2
+
+        else:
+            self.player_turn = self.player1
+            return self.player1
 
     def is_valid_play(self, play: Play) -> bool:
 
@@ -125,11 +150,11 @@ class Game:
         # check if a 3 is played and ability used, that that card is in hand player
         if card.value == 3 and play.use_ability == True:
 
-            if play.ability_card not in hand:
+            if (play.ability_card not in hand) or (play.ability_card == play.card):
                 return False
 
         # if this is the first card to be played
-        if len(self.played_cards) == 0:
+        if len(self.current_trick_cards) == 0:
 
             return True
 
@@ -137,10 +162,10 @@ class Game:
         else:
 
             # if suit matches first card play is valid
-            if self.played_cards[0].suit == card.suit:
+            if self.current_trick_cards[0].suit == card.suit:
 
                 # exception: if 11 was played, check it is 1 or highest
-                if self.played_cards[0].value == 11:
+                if self.current_trick_cards[0].value == 11:
 
                     # check value is 1 or no higher card exists in hand
                     if card.value != 1 and not all(
@@ -154,7 +179,7 @@ class Game:
             # if not, verify no suit matching first card in hand
             else:
 
-                return self.played_cards[0].suit not in [x.suit for x in hand]
+                return self.current_trick_cards[0].suit not in [x.suit for x in hand]
 
     def execute_play(self, play: Play) -> None:
 
@@ -164,14 +189,13 @@ class Game:
 
         setattr(play.card, "played_by", play.player)
 
-        self.played_cards.append(play.card)
+        self.current_trick_cards.append(play.card)
         play.player.hand.remove(play.card)
 
         # if 3 played and ability used, exhange decree card with ability card
         if play.card.value == 3 and play.use_ability:
 
             assert type(play.ability_card) == Card
-
             play.player.add_to_hand([self.decree_card])
             self.decree_card = play.ability_card
             play.player.hand.remove(play.ability_card)
@@ -181,29 +205,36 @@ class Game:
 
             play.player.add_to_hand(self.deck.draw_top_n_cards(1))
 
-            card_to_discard = play.player.request_discard(self)
+            # TODO set to false again in next block
+            self.wait_for_discard = True
 
-            if card_to_discard not in play.player.hand:
-
-                raise InvalidPlay("Suggested card to discard not in hand")
-
-            play.player.hand.remove(card_to_discard)
-
-            self.deck.cards.append(card_to_discard)
+            return None
 
         # if first card played, change turn
-        if len(self.played_cards) == 1:
+        if len(self.current_trick_cards) == 1:
 
-            if play.player == self.player1:
-                self.player_turn = self.player2
+            self.change_turn()
 
-            else:
-                self.player_turn = self.player1
+    def execute_discard(self, play: Play) -> None:
+
+        if play.card not in play.player.hand:
+
+            raise InvalidPlay("Suggested card to discard not in hand")
+
+        play.player.hand.remove(play.card)
+
+        self.deck.cards.append(play.card)
+
+        self.wait_for_discard = False
+
+        self.change_turn()
+
+        return None
 
     def determine_trick_winner(self) -> Player:
 
-        card_1 = self.played_cards[0]
-        card_2 = self.played_cards[1]
+        card_1 = self.current_trick_cards[0]
+        card_2 = self.current_trick_cards[1]
 
         assert isinstance(card_1.played_by, Player)
         assert isinstance(card_2.played_by, Player)
@@ -309,12 +340,22 @@ class Game:
             play1 = self.player_turn.request_play(self)
             self.execute_play(play1)
 
+            if self.wait_for_discard == True:
+                card_to_discard = play1.player.request_discard(self)
+                discard_play = Play(play1.player, card_to_discard)
+                self.execute_discard(discard_play)
+
             print(
                 f"Player {play1.player.name} plays: {play1.card.value} {play1.card.suit}"
             )
 
             play2 = self.player_turn.request_play(self)
             self.execute_play(play2)
+
+            if self.wait_for_discard == True:
+                card_to_discard = play2.player.request_discard(self)
+                discard_play = Play(play2.player, card_to_discard)
+                self.execute_discard(discard_play)
 
             print(
                 f"Player {play2.player.name} plays: {play2.card.value} {play2.card.suit}"
@@ -326,24 +367,104 @@ class Game:
             print(f"Winner is: {winner.name}")
 
             # cards added to hand and turn given to winner
-            winner.add_to_tricks_won(self.played_cards)
+            self.played_tricks.append(self.current_trick_cards)
+            winner.add_to_tricks_won(self.current_trick_cards)
 
             self.player_turn = winner
 
             # unless 1 was played but did not win trick
-            for card in self.played_cards:
+            for card in self.current_trick_cards:
                 assert isinstance(card.played_by, Player)
                 if card.value == 1 and card.played_by != winner:
                     self.player_turn = card.played_by
 
-            self.played_cards = []
+            self.current_trick_cards = []
 
             self.turns += 1
+
+        self.round_done = True
 
         print(f"Player 1 won {len(self.player1.tricks_won)} tricks")
         print(f"Player 2 won {len(self.player2.tricks_won)} tricks")
 
         print(f"Final points {self.determine_points_end_round()}")
+
+    def step(self, play: Play) -> None:
+        """Steps through one round of play,
+        executing the passed Play, until it is player1's turn again.
+        In this way it is possible to play a game using direct function calls as input from the player
+
+        Args:
+            play (Play): _description_
+        """
+
+        # if waiting for discard from player execute discard and return
+        if self.wait_for_discard == True:
+
+            self.execute_discard(play)
+
+        else:
+
+            self.execute_play(play)
+
+            # if waiting for discard, return and wait for next play
+            if self.wait_for_discard == True:
+
+                return None
+
+        # If this was first card played, player2 needs to play a card
+        if len(self.current_trick_cards) == 1:
+
+            play2 = self.player_turn.request_play(self)
+            self.execute_play(play2)
+
+            # if 5 was played, request discard
+            if self.wait_for_discard == True:
+
+                card_to_discard = self.player_turn.request_discard(self)
+                discard_play = Play(self.player_turn, card_to_discard)
+
+                self.execute_discard(discard_play)
+
+        # winner is determined
+        winner = self.determine_trick_winner()
+
+        # cards added to hand and turn given to winner
+        self.played_tricks.append(self.current_trick_cards)
+        winner.add_to_tricks_won(self.current_trick_cards)
+
+        self.player_turn = winner
+
+        # unless 1 was played but did not win trick
+        for card in self.current_trick_cards:
+            assert isinstance(card.played_by, Player)
+            if card.value == 1 and card.played_by != winner:
+                self.player_turn = card.played_by
+
+        self.current_trick_cards = []
+
+        self.turns += 1
+
+        # If it is player2's turn, make them play the first card
+
+        if self.player_turn == self.player2 and self.turns < 13:
+
+            play2 = self.player2.request_play(self)
+            self.execute_play(play2)
+
+            # if 5 was played, request discard
+            if self.wait_for_discard == True:
+
+                card_to_discard = self.player_turn.request_discard(self)
+                discard_play = Play(self.player_turn, card_to_discard)
+
+                self.execute_discard(discard_play)
+
+        if self.turns >= 13:
+
+            self.round_done = True
+
+        return None
 
 
 def print_deck(deck: Deck):
