@@ -106,7 +106,7 @@ state = st.session_state
 
 st.title("Play a game of the fox in the forest")
 
-st.write(state.game_state)
+# st.write(state.game_state)
 
 nr_of_cards = len(game.player1.hand)
 
